@@ -1,19 +1,29 @@
-pub(crate) const FEATURES: &[(&str, &str, &str)] = &[
-    ("tinyvg", "TinyVG", "Vector graphics support"),
+pub(crate) const FEATURES: &[(&str, &str, &str, Option<&str>)] = &[
+    ("tinyvg", "TinyVG", "Vector graphics support", None),
     (
         "built-in-shaders",
         "Built-in shaders",
         "Pre-made visual effects (glow, holographic, gradient, etc.)",
+        None,
     ),
     (
         "shader-pipeline",
         "Shader pipeline",
         "Custom shader compilation with SPIR-V Cross (adds build.rs)",
+        None,
     ),
     (
         "text-styling",
         "Text styling",
         "Rich text with inline formatting",
+        None,
+    ),
+    ("net", "Networking", "HTTP and WebSocket support", None),
+    (
+        "net-json",
+        "JSON Support",
+        "JSON deserialization with serde",
+        Some("net"),
     ),
 ];
 

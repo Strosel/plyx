@@ -330,8 +330,26 @@ enum FeatureRow<'a> {
         key: &'a str,
         label: &'a str,
         desc: &'a str,
+        parent: Option<&'a str>,
     },
     Action(&'a str),
+}
+
+/// Check if a feature is visible (has no parent, or its parent is checked).
+fn feature_visible(
+    features: &[(&str, &str, &str, Option<&str>)],
+    checked: &[bool],
+    idx: usize,
+) -> bool {
+    match features.get(idx) {
+        Some((_, _, _, Some(parent_key))) => features
+            .iter()
+            .enumerate()
+            .any(|(j, (k, _, _, _))| {
+                *k == *parent_key && checked.get(j).copied().unwrap_or(false)
+            }),
+        _ => true,
+    }
 }
 
 /// Multi-select for features with a final action button.
@@ -348,7 +366,7 @@ enum FeatureRow<'a> {
 /// `action_label` — e.g. `"Create!"` or `"Done!"`.
 pub fn feature_select(
     prompt: &str,
-    features: &[(&str, &str, &str)],
+    features: &[(&str, &str, &str, Option<&str>)],
     help: &str,
     pre_checked: &[&str],
     locked: &[&str],
@@ -360,7 +378,7 @@ pub fn feature_select(
 
 fn feature_select_inner(
     prompt: &str,
-    features: &[(&str, &str, &str)],
+    features: &[(&str, &str, &str, Option<&str>)],
     help: &str,
     pre_checked: &[&str],
     locked: &[&str],
@@ -371,14 +389,14 @@ fn feature_select_inner(
 
     let mut rows: Vec<FeatureRow> = features
         .iter()
-        .map(|&(key, label, desc)| FeatureRow::Feature { key, label, desc })
+        .map(|&(key, label, desc, parent)| FeatureRow::Feature { key, label, desc, parent })
         .collect();
     rows.push(FeatureRow::Action(action_label));
 
     let mut cursor: usize = 0;
     let mut checked: Vec<bool> = features
         .iter()
-        .map(|(key, _, _)| pre_checked.contains(key))
+        .map(|(key, _, _, _)| pre_checked.contains(key))
         .collect();
 
     let mut sorry_index: Option<usize> = None;
@@ -397,14 +415,20 @@ fn feature_select_inner(
 
             match key.code {
                 KeyCode::Up => {
-                    if cursor > 0 {
-                        cursor -= 1;
+                    for i in (0..cursor).rev() {
+                        if i >= features.len() || feature_visible(features, &checked, i) {
+                            cursor = i;
+                            break;
+                        }
                     }
                     sorry_index = None;
                 }
                 KeyCode::Down => {
-                    if cursor + 1 < rows.len() {
-                        cursor += 1;
+                    for i in (cursor + 1)..rows.len() {
+                        if i >= features.len() || feature_visible(features, &checked, i) {
+                            cursor = i;
+                            break;
+                        }
                     }
                     sorry_index = None;
                 }
@@ -415,6 +439,16 @@ fn feature_select_inner(
                         } else {
                             if let Some(c) = checked.get_mut(cursor) {
                                 *c = !*c;
+                                // If unchecking a parent, uncheck its children
+                                if !*c {
+                                    for (ci, (_, _, _, p)) in features.iter().enumerate() {
+                                        if *p == Some(*fkey) {
+                                            if let Some(cc) = checked.get_mut(ci) {
+                                                *cc = false;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             sorry_index = None;
                         }
@@ -424,7 +458,7 @@ fn feature_select_inner(
                             .iter()
                             .enumerate()
                             .filter(|(i, _)| checked.get(*i).copied().unwrap_or(false))
-                            .map(|(_, (key, _, _))| key.to_string())
+                            .map(|(_, (key, _, _, _))| key.to_string())
                             .collect();
 
                         move_up(&mut out, last_lines)?;
@@ -434,8 +468,8 @@ fn feature_select_inner(
                         } else {
                             features
                                 .iter()
-                                .filter(|(k, _, _)| result.iter().any(|r| r == *k))
-                                .map(|(_, l, _)| *l)
+                                .filter(|(k, _, _, _)| result.iter().any(|r| r == *k))
+                                .map(|(_, l, _, _)| *l)
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         };
@@ -479,17 +513,28 @@ fn render_features(
 
     for (i, row) in rows.iter().enumerate() {
         match row {
-            FeatureRow::Feature { key, label, desc } => {
+            FeatureRow::Feature { key, label, desc, parent } => {
+                // Skip hidden children (parent not checked)
+                if let Some(parent_key) = parent {
+                    let parent_checked = rows.iter().enumerate().any(|(j, r)| {
+                        matches!(r, FeatureRow::Feature { key: k, .. } if *k == *parent_key)
+                            && checked.get(j).copied().unwrap_or(false)
+                    });
+                    if !parent_checked {
+                        continue;
+                    }
+                }
+                let indent = if parent.is_some() { "        " } else { "    " };
                 if sorry_index == Some(i) {
                     out.queue(style::Print(
-                        style::style("    Sorry, plyx doesn't want to break anything :(").red(),
+                        style::style(format!("{indent}Sorry, plyx doesn't want to break anything :(")).red(),
                     ))?;
                 } else {
                     let is_cursor = i == cursor;
                     let is_checked = checked.get(i).copied().unwrap_or(false);
                     let is_locked = locked.contains(key);
                     let checkbox = if is_checked || is_locked { "[x]" } else { "[ ]" };
-                    let text = format!("    {checkbox} {label}: {desc}");
+                    let text = format!("{indent}{checkbox} {label}: {desc}");
                     if is_cursor {
                         out.queue(style::Print(style::style(text).blue()))?;
                     } else if is_checked || is_locked {
@@ -544,7 +589,7 @@ pub struct AddResult {
 /// `installed_fonts` — font names already in assets/fonts/ (green, sorry on add).
 pub fn add_widget(
     prompt: &str,
-    features: &[(&str, &str, &str)],
+    features: &[(&str, &str, &str, Option<&str>)],
     font_items: &[String],
     locked_features: &[&str],
     installed_fonts: &[String],
@@ -563,7 +608,7 @@ enum AddCursorPos {
 
 fn add_widget_inner(
     prompt: &str,
-    features: &[(&str, &str, &str)],
+    features: &[(&str, &str, &str, Option<&str>)],
     font_items: &[String],
     locked_features: &[&str],
     installed_fonts: &[String],
@@ -575,7 +620,7 @@ fn add_widget_inner(
     let mut cursor = AddCursorPos::Feature(0);
     let mut feature_checked: Vec<bool> = features
         .iter()
-        .map(|(key, _, _)| locked_features.contains(key))
+        .map(|(key, _, _, _)| locked_features.contains(key))
         .collect();
     let mut font_query = String::new();
     let mut added_fonts: Vec<String> = Vec::new();
@@ -612,15 +657,27 @@ fn add_widget_inner(
                     let idx = *idx;
                     match key.code {
                         KeyCode::Up => {
-                            if idx > 0 {
-                                cursor = AddCursorPos::Feature(idx - 1);
+                            let mut found = false;
+                            for i in (0..idx).rev() {
+                                if feature_visible(features, &feature_checked, i) {
+                                    cursor = AddCursorPos::Feature(i);
+                                    found = true;
+                                    break;
+                                }
                             }
+                            let _ = found;
                             sorry_feature = None;
                         }
                         KeyCode::Down => {
-                            if idx + 1 < features.len() {
-                                cursor = AddCursorPos::Feature(idx + 1);
-                            } else {
+                            let mut found = false;
+                            for i in (idx + 1)..features.len() {
+                                if feature_visible(features, &feature_checked, i) {
+                                    cursor = AddCursorPos::Feature(i);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if !found {
                                 cursor = AddCursorPos::FontSearch;
                             }
                             sorry_feature = None;
@@ -632,6 +689,15 @@ fn add_widget_inner(
                             } else {
                                 if let Some(c) = feature_checked.get_mut(idx) {
                                     *c = !*c;
+                                    if !*c {
+                                        for (ci, (_, _, _, p)) in features.iter().enumerate() {
+                                            if *p == Some(fkey) {
+                                                if let Some(cc) = feature_checked.get_mut(ci) {
+                                                    *cc = false;
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 sorry_feature = None;
                             }
@@ -644,8 +710,11 @@ fn add_widget_inner(
                 }
                 AddCursorPos::FontSearch => match key.code {
                     KeyCode::Up => {
-                        if !features.is_empty() {
-                            cursor = AddCursorPos::Feature(features.len() - 1);
+                        for i in (0..features.len()).rev() {
+                            if feature_visible(features, &feature_checked, i) {
+                                cursor = AddCursorPos::Feature(i);
+                                break;
+                            }
                         }
                         font_sorry = false;
                     }
@@ -691,11 +760,11 @@ fn add_widget_inner(
                         let new_features: Vec<String> = features
                             .iter()
                             .enumerate()
-                            .filter(|(i, (key, _, _))| {
+                            .filter(|(i, (key, _, _, _))| {
                                 feature_checked.get(*i).copied().unwrap_or(false)
                                     && !locked_features.contains(key)
                             })
-                            .map(|(_, (key, _, _))| key.to_string())
+                            .map(|(_, (key, _, _, _))| key.to_string())
                             .collect();
 
                         move_up(&mut out, last_lines)?;
@@ -708,8 +777,8 @@ fn add_widget_inner(
                                 .filter_map(|k| {
                                     features
                                         .iter()
-                                        .find(|(fk, _, _)| fk == k)
-                                        .map(|(_, l, _)| *l)
+                                        .find(|(fk, _, _, _)| fk == k)
+                                        .map(|(_, l, _, _)| *l)
                                 })
                                 .collect();
                             parts.push(format!("Features: {}", names.join(", ")));
@@ -757,7 +826,7 @@ fn add_widget_inner(
 fn render_add(
     out: &mut io::Stdout,
     prompt: &str,
-    features: &[(&str, &str, &str)],
+    features: &[(&str, &str, &str, Option<&str>)],
     font_items: &[String],
     locked_features: &[&str],
     installed_fonts: &[String],
@@ -785,18 +854,29 @@ fn render_add(
     let mut lines: u16 = 1;
 
     // ── Feature rows
-    for (i, (key, label, desc)) in features.iter().enumerate() {
+    for (i, (key, label, desc, parent)) in features.iter().enumerate() {
+        // Skip hidden children (parent not checked)
+        if let Some(parent_key) = parent {
+            let parent_checked = features.iter().enumerate().any(|(j, (k, _, _, _))| {
+                *k == *parent_key && feature_checked.get(j).copied().unwrap_or(false)
+            });
+            if !parent_checked {
+                continue;
+            }
+        }
+
         let is_cursor = matches!(cursor, AddCursorPos::Feature(ci) if *ci == i);
+        let indent = if parent.is_some() { "        " } else { "    " };
 
         if sorry_feature == Some(i) {
             out.queue(style::Print(
-                style::style("    Sorry, plyx doesn't want to break anything :(").red(),
+                style::style(format!("{indent}Sorry, plyx doesn't want to break anything :(")).red(),
             ))?;
         } else {
             let is_checked = feature_checked.get(i).copied().unwrap_or(false);
             let is_locked = locked_features.contains(key);
             let checkbox = if is_checked || is_locked { "[x]" } else { "[ ]" };
-            let text = format!("    {checkbox} {label}: {desc}");
+            let text = format!("{indent}{checkbox} {label}: {desc}");
             if is_cursor {
                 out.queue(style::Print(style::style(text).blue()))?;
             } else if is_checked || is_locked {
@@ -866,11 +946,11 @@ fn render_add(
     let new_features: Vec<&str> = features
         .iter()
         .enumerate()
-        .filter(|(i, (key, _, _))| {
+        .filter(|(i, (key, _, _, _))| {
             feature_checked.get(*i).copied().unwrap_or(false)
                 && !locked_features.contains(key)
         })
-        .map(|(_, (_, l, _))| *l)
+        .map(|(_, (_, l, _, _))| *l)
         .collect();
     if !new_features.is_empty() || !added_fonts.is_empty() {
         let mut summary_parts = Vec::new();

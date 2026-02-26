@@ -82,8 +82,8 @@ fn interactive_add() -> Result<(), String> {
 
 fn add_feature_by_key(key: &str) -> Result<(), String> {
     // Validate the key
-    if !FEATURES.iter().any(|(k, _, _)| k == &key) {
-        let valid: Vec<&str> = FEATURES.iter().map(|(k, _, _)| *k).collect();
+    if !FEATURES.iter().any(|(k, _, _, _)| k == &key) {
+        let valid: Vec<&str> = FEATURES.iter().map(|(k, _, _, _)| *k).collect();
         return Err(format!(
             "Unknown feature '{key}'. Valid features: {}",
             valid.join(", ")
