@@ -1,5 +1,10 @@
 pub(crate) const FEATURES: &[(&str, &str, &str, Option<&str>)] = &[
-    ("tinyvg", "TinyVG", "Vector graphics support", None),
+    (
+        "tinyvg",
+        "TinyVG",
+        "Vector graphics support",
+        None
+    ),
     (
         "built-in-shaders",
         "Built-in shaders",
@@ -18,12 +23,23 @@ pub(crate) const FEATURES: &[(&str, &str, &str, Option<&str>)] = &[
         "Rich text with inline formatting",
         None,
     ),
-    ("net", "Networking", "HTTP and WebSocket support", None),
+    (
+        "net",
+        "Networking",
+        "HTTP and WebSocket support",
+        None
+    ),
     (
         "net-json",
         "JSON Support",
         "JSON deserialization with serde",
         Some("net"),
+    ),
+    (
+        "audio",
+        "Audio",
+        "Sound loading and playback",
+        None
     ),
 ];
 
@@ -66,9 +82,6 @@ edition = "2021"
         ));
     }
 
-    toml.push_str(
-        "macroquad = { version = \"0.4\", git = \"https://github.com/TheRedDeveloper/macroquad-fix\" }\n",
-    );
 
     if features.contains(&"shader-pipeline") {
         toml.push_str(
