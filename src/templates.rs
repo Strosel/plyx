@@ -87,7 +87,7 @@ edition = "2021"
         toml.push_str(
             r#"
 [build-dependencies]
-ply-engine = { git = "https://github.com/TheRedDeveloper/ply-engine", features = ["shader-build"] }
+ply-engine = { git = "https://github.com/TheRedDeveloper/ply-engine", default-features = false, features = ["shader-build"] }
 "#,
         );
     }
