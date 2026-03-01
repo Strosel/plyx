@@ -69,7 +69,7 @@ edition = "2021"
 
     if ply_features.is_empty() {
         toml.push_str(
-            "ply-engine = { git = \"https://github.com/TheRedDeveloper/ply-engine\" }\n",
+            "ply-engine = \"1.0\"\n",
         );
     } else {
         let feat_str = ply_features
@@ -78,7 +78,7 @@ edition = "2021"
             .collect::<Vec<_>>()
             .join(", ");
         toml.push_str(&format!(
-            "ply-engine = {{ git = \"https://github.com/TheRedDeveloper/ply-engine\", features = [{feat_str}] }}\n"
+            "ply-engine = {{ version = \"1.0\", features = [{feat_str}] }}\n"
         ));
     }
 
@@ -87,7 +87,7 @@ edition = "2021"
         toml.push_str(
             r#"
 [build-dependencies]
-ply-engine = { git = "https://github.com/TheRedDeveloper/ply-engine", default-features = false, features = ["shader-build"] }
+ply-engine = { version = "1.0", default-features = false, features = ["shader-build"] }
 "#,
         );
     }
