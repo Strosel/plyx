@@ -6,7 +6,7 @@
 
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
     style::{self, Stylize},
     terminal, ExecutableCommand, QueueableCommand,
 };
@@ -94,6 +94,7 @@ fn confirm_inner(prompt: &str) -> io::Result<bool> {
 
     loop {
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press { continue; }
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
                     out.queue(style::Print("Yes\r\n"))?;
@@ -135,6 +136,7 @@ fn text_input_inner(prompt: &str, default: &str) -> io::Result<String> {
 
     loop {
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press { continue; }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                 drop(_guard);
                 std::process::exit(130);
@@ -211,6 +213,7 @@ fn search_select_inner(prompt: &str, items: &[String], help: &str) -> io::Result
 
     loop {
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press { continue; }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                 drop(_guard);
                 std::process::exit(130);
@@ -408,6 +411,7 @@ fn feature_select_inner(
 
     loop {
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press { continue; }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                 drop(_guard);
                 std::process::exit(130);
@@ -647,6 +651,7 @@ fn add_widget_inner(
 
     loop {
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press { continue; }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                 drop(_guard);
                 std::process::exit(130);
