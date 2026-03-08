@@ -9,6 +9,17 @@
 
 use std::path::{Path, PathBuf};
 
+pub(crate) fn http_agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build()
+        )
+        .build()
+        .new_agent()
+}
+
 const FONT_LIST_URL: &str =
     "https://raw.githubusercontent.com/TheRedDeveloper/plyx/refs/heads/main/fontlist.json";
 
@@ -24,7 +35,8 @@ fn cache_path() -> PathBuf {
 fn fetch_font_list() -> Result<Vec<String>, String> {
     println!("Fetching Google Fonts catalog...");
 
-    let response = ureq::get(FONT_LIST_URL)
+    let response = http_agent()
+        .get(FONT_LIST_URL)
         .call()
         .map_err(|e| format!("Failed to fetch font list: {e}"))?;
 
@@ -115,8 +127,7 @@ pub fn download(family: &str, dest_dir: &Path) -> Result<PathBuf, String> {
         family.replace(' ', "+")
     );
 
-    let agent = ureq::Agent::new_with_defaults();
-    let mut css_response = agent
+    let mut css_response = http_agent()
         .get(&css_url)
         .header("User-Agent", "plyx/0.1")
         .call()
@@ -133,7 +144,7 @@ pub fn download(family: &str, dest_dir: &Path) -> Result<PathBuf, String> {
     let ttf_url = extract_ttf_url(&css)
         .ok_or_else(|| format!("No .ttf URL found in CSS for {family}. CSS:\n{css}"))?;
 
-    let mut font_response = agent
+    let mut font_response = http_agent()
         .get(ttf_url)
         .call()
         .map_err(|e| format!("Failed to download font file: {e}"))?;

@@ -169,7 +169,8 @@ fn download_bundle(dest: &Path) -> Result<(), String> {
 }
 
 fn fetch_bundle() -> Result<Vec<u8>, String> {
-    let response = ureq::get(PLY_BUNDLE_URL)
+    let response = crate::fonts::http_agent()
+        .get(PLY_BUNDLE_URL)
         .call()
         .map_err(|e| format!("{e}"))?;
 
