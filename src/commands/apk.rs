@@ -807,22 +807,35 @@ fn download_sdk(dest: &str) -> Result<(), String> {
 }
 
 fn check_cargo_quad_apk() -> Result<(), String> {
-    let has_it = Command::new("cargo")
-        .args(["quad-apk", "--version"])
+    // Check if cargo-quad-apk is installed from the correct fork
+    let install_list = Command::new("cargo")
+        .args(["install", "--list"])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+        .ok()
+        .and_then(|o| if o.status.success() { Some(o.stdout) } else { None })
+        .and_then(|b| String::from_utf8(b).ok())
+        .unwrap_or_default();
 
-    if has_it {
+    let needs_install = if install_list.contains("TheRedDeveloper/cargo-quad-apk-ply") {
+        false
+    } else if install_list.contains("cargo-quad-apk") {
+        println!("Reinstalling cargo-quad-apk from ply fork...");
+        true
+    } else {
+        println!("Installing cargo-quad-apk...");
+        true
+    };
+
+    if !needs_install {
         return Ok(());
     }
 
-    println!("Installing cargo-quad-apk...");
     let status = Command::new("cargo")
         .args([
             "install",
             "--git",
-            "https://github.com/not-fl3/cargo-quad-apk",
+            "https://github.com/TheRedDeveloper/cargo-quad-apk-ply",
+            "--force",
         ])
         .status()
         .map_err(|e| format!("Failed to install cargo-quad-apk: {e}"))?;

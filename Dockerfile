@@ -65,7 +65,7 @@ RUN cd /usr/local && \
 ENV NDK_HOME=/usr/local/android-ndk-r25
 
 # ── cargo-quad-apk ──────────────────────────────────────────────────────
-RUN cargo install --git https://github.com/not-fl3/cargo-quad-apk
+RUN cargo install --git https://github.com/TheRedDeveloper/cargo-quad-apk-ply
 
 # ── Add build-tools to PATH (for apksigner) ─────────────────────────────
 ENV PATH="${ANDROID_HOME}/build-tools/36.0.0-rc5:${PATH}"
