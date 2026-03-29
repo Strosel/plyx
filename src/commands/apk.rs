@@ -807,6 +807,8 @@ fn download_sdk(dest: &str) -> Result<(), String> {
 }
 
 fn check_cargo_quad_apk() -> Result<(), String> {
+    //Cargo install --list will not work under nix
+    return Ok(());
     // Check if cargo-quad-apk is installed from the correct fork
     let install_list = Command::new("cargo")
         .args(["install", "--list"])
